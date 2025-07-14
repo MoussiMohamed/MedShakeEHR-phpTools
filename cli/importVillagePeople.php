@@ -26,12 +26,16 @@
  * (génération d'une population aléatoire)
  *
  * @author Bertrand Boutillier <b.boutillier@gmail.com>
+ * @contrib Michaël Val
  */
 
 ini_set('display_errors', 1);
 
+if (!empty($homepath = getenv("MEDSHAKEEHRPATH"))) $homepath = getenv("MEDSHAKEEHRPATH");
+else $homepath = preg_replace("#cli$#", '', __DIR__);
+
 /////////// Composer class auto-upload
-require '../vendor/autoload.php';
+require $homepath . 'vendor/autoload.php';
 
 $homepath=getenv("MEDSHAKEEHRPATH");
 spl_autoload_register(function ($class) {
@@ -42,7 +46,7 @@ spl_autoload_register(function ($class) {
 });
 
 /////////// Config loader
-$p['config']=Spyc::YAMLLoad($homepath.'config/config.yml');
+$p['config'] = msYAML::yamlFileRead($homepath . 'config/config.yml');
 
 /////////// correction pour host non présent (IP qui change)
 if ($p['config']['host']=='') {
@@ -52,8 +56,7 @@ if ($p['config']['host']=='') {
 $p['homepath']=$homepath;
 
 /////////// SQL connexion
-$mysqli=msSQL::sqlConnect();
-
+$pdo = msSQL::sqlConnect();
 
 $csvFile = file('export.csv');
 foreach ($csvFile as $line) {
@@ -61,7 +64,7 @@ foreach ($csvFile as $line) {
   if(!is_numeric($d[0])) continue;
 
   $newpatient = new msPeopleRelations();
-  $newpatient->setFromID('3');
+  $newpatient->setFromID('5');
   $newpatient->setType('patient');
   $newpatient->createNew($d[0]);
 }
@@ -75,12 +78,12 @@ foreach ($csvFile as $line) {
     echo $d[0]."<br>\n";
 
     $patient = new msPeopleRelations();
-    $patient->setFromID('3');
+    $patient->setFromID('5');
     $patient->setToID($d[0]);
     $patient->setType('patient');
 
     $pd = new msObjet();
-    $pd->setFromID('3');
+    $pd->setFromID('5');
     $pd->setToID($d[0]);
 
     $date = DateTime::createFromFormat('Y-m-d', $d[4]);
@@ -115,20 +118,33 @@ foreach ($csvFile as $line) {
 
     // conjoint
     if($d[13] > 0) {
-      $patient->setRelationWithOtherPatient('conjoint', $d[13]);
+      $patient->setWithID($d[13]);
+      $patient->setToStatus('conjoint');
+      $patient->setRelationType('relationPatientPatient');
+      $patient->setRelation();
     }
 
     // enfants
     if(!empty($d[11])) {
-      foreach(explode(',', $d[11]) as $k=>$v) {
-        $patient->setRelationWithOtherPatient('enfant', $v);
+      foreach(explode(',', $d[11]) as $v) {
+        if(is_numeric($v)) {
+          $patient->setWithID($v);
+          $patient->setToStatus('enfant');
+          $patient->setRelationType('relationPatientPatient');
+          $patient->setRelation();
+        }
       }
     }
 
     // fratrie
     if(!empty($d[12])) {
-      foreach(explode(',', $d[12]) as $k=>$v) {
-        $patient->setRelationWithOtherPatient('sœur / frère', $v);
+      foreach(explode(',', $d[12]) as $v) {
+        if(is_numeric($v)) {
+          $patient->setWithID($v);  
+          $patient->setToStatus('sœur / frère');
+          $patient->setRelationType('relationPatientPatient');
+          $patient->setRelation();
+        }
       }
     }
 
